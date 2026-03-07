@@ -16,6 +16,13 @@ class Simulation:
         self.rider_queue     = Queue[Rider]()
         self.driver_queue    = Queue[Driver]()
 
+        # Metrics 
+        self.total_riders = 0
+        self.abandoned_riders = 0
+        self.served_riders = 0
+
+        self.total_wait_time = 0.0
+
         # add termination to event calendar
         self.event_calendar.add_event(self.simulation_length, event_type=EventType.TERMINATION)
 
@@ -26,9 +33,7 @@ class Simulation:
                              origin=Distributions.generate_location(), 
                              destination=Distributions.generate_location(), 
                              patience_time=rider_patience_time)
-
-        # add to rider queue
-        self.rider_queue.enqueue(first_rider.rider_id, first_rider)
+        print("first rider arrival:", rider_arrival_time)
 
         # create 1st driver
         driver_arrival_time = self.current_time + Distributions.generate_driver_interarival()
@@ -37,10 +42,6 @@ class Simulation:
                                arrival_time=driver_arrival_time,
                                shift_end_time=driver_shift_time,
                                location=Distributions.generate_location())
-        
-        # add driver to driver queue
-        # self.driver_queue.enqueue(first_driver.driver_id, first_driver)
-        self.driver_queue.enqueue(first_driver.driver_id, first_driver)
 
         # add to event calendar:
         # first rider arrival
@@ -70,12 +71,17 @@ class Simulation:
         # current_rider = Rider()
         while not self.driver_queue.is_empty() and not self.rider_queue.is_empty():
             current_rider = self.rider_queue.dequeue()
+            # waiting time
+            wait_time = current_time - current_rider.arrival_time
+            self.total_wait_time += wait_time
+            self.served_riders += 1
             matched_driver = Driver()
             min_distance_to_driver = float('inf')
             
             for current_driver in self.driver_queue.items.values():
                 distance_to_driver = self.calculate_distance(loc1=current_driver.location, loc2=current_rider.origin)
                 if distance_to_driver < min_distance_to_driver:
+                    min_distance_to_driver = distance_to_driver
                     matched_driver = current_driver
             
             # Matched driver!
@@ -131,6 +137,7 @@ class Simulation:
                 # Start matching algo
                 # matching algo until rider queue or driver queue is empty
                 print(f"Rider arrival: {next_event.data.rider_id}")
+                self.total_riders += 1
                 # add to rider queue
                 self.rider_queue.enqueue(next_event.data.rider_id, next_event.data)
                 print("start matching algo...")
@@ -196,6 +203,7 @@ class Simulation:
                 remove = self.rider_queue.remove_by_id(next_event.data.rider_id)
                 if remove:
                     print(f"Rider abandoned: {next_event.data.rider_id}")
+                    self.abandoned_riders += 1
                 else:
                     print(f"Rider {next_event.data.rider_id} already served!")
 
@@ -213,9 +221,27 @@ class Simulation:
             
             elif next_event.event_type == EventType.TERMINATION:
                 print("Simulation Termination")
+
+                # Rider abandonment rate
+                if self.total_riders > 0:
+                    rider_abandonment = self.abandoned_riders / self.total_riders
+                else:
+                    rider_abandonment = 0
+
+                # Mean rider waiting time
+                if self.served_riders > 0:
+                    mean_waiting_time = self.total_wait_time / self.served_riders
+                else:
+                    mean_waiting_time = 0
+
+                print("------ Simulation Metrics ------")
+                print(f"Total riders: {self.total_riders}")
+                print(f"Served riders: {self.served_riders}")
+                print(f"Abandoned riders: {self.abandoned_riders}")
+                print(f"Rider abandonment rate: {rider_abandonment:.4f}")
+                print(f"Mean rider waiting time: {mean_waiting_time:.4f}")
                 print("-----------------------------------")
                 return
-            
             else:
                 print("Something wrong..")
                 print("-----------------------------------")
