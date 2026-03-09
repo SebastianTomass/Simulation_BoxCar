@@ -76,57 +76,56 @@ class Simulation:
 
 
     def matching_algo(self, current_time: float):
-        # current_rider = Rider()
-        if self.driver_queue.is_empty() or self.rider_queue.is_empty():
-            return
-        current_rider = self.rider_queue.dequeue()
-        matched_driver = None
-        min_distance_to_driver = float('inf')
-            
-        for current_driver in self.driver_queue.items.values():
-            distance_to_driver = self.calculate_distance(loc1=current_driver.location, loc2=current_rider.origin)
-            if distance_to_driver < min_distance_to_driver:
-                min_distance_to_driver = distance_to_driver
-                matched_driver = current_driver
-            
-        if matched_driver is None:
-            # Safety: if something went wrong, put the rider back and stop
-            self.rider_queue.enqueue(current_rider.rider_id, current_rider)
-            return
+        while not self.driver_queue.is_empty() and not self.rider_queue.is_empty():
+            current_rider = self.rider_queue.dequeue()
+            matched_driver = None
+            min_distance_to_driver = float('inf')
 
-        # Matched driver!
-        self.log(f"Rider {current_rider.rider_id} matched with Driver {matched_driver.driver_id}")
+            for current_driver in self.driver_queue.items.values():
+                distance_to_driver = self.calculate_distance(
+                    loc1=current_driver.location,
+                    loc2=current_rider.origin
+                )
+                if distance_to_driver < min_distance_to_driver:
+                    min_distance_to_driver = distance_to_driver
+                    matched_driver = current_driver
 
-        # Calculate Trip end times, update distance to be travelled by driver, 
-        pickup_distance = min_distance_to_driver
-        trip_distance = self.calculate_distance(
-            loc1=current_rider.origin,
-            loc2=current_rider.destination
-        )
+            if matched_driver is None:
+                # Safety: put rider back and stop
+                self.rider_queue.enqueue(current_rider.rider_id, current_rider)
+                return
 
-        expected_time_driver_to_rider = pickup_distance / self.avg_speed
-        estimated_time_driver_to_rider = Distributions.estimated_trip_time(
-            expected_trip_time=expected_time_driver_to_rider
-        )
+            self.log(f"Rider {current_rider.rider_id} matched with Driver {matched_driver.driver_id}")
 
-        pickup_time = current_time + estimated_time_driver_to_rider
+            pickup_distance = min_distance_to_driver
+            trip_distance = self.calculate_distance(
+                loc1=current_rider.origin,
+                loc2=current_rider.destination
+            )
 
-        new_trip = Trip(
-            driver=matched_driver,
-            rider=current_rider,
-            trip_start_time=current_time,
-            pickup_time=pickup_time,
-            pickup_distance=pickup_distance,
-            trip_distance=trip_distance
-        )
+            expected_time_driver_to_rider = pickup_distance / self.avg_speed
+            estimated_time_driver_to_rider = Distributions.estimated_trip_time(
+                expected_trip_time=expected_time_driver_to_rider
+            )
 
-        self.event_calendar.add_event(
-            time=pickup_time,
-            event_type=EventType.DRIVER_REACHES_PICKUP,
-            data=new_trip
-        )
+            pickup_time = current_time + estimated_time_driver_to_rider
 
-        self.driver_queue.remove_by_id(item_id=matched_driver.driver_id)
+            new_trip = Trip(
+                driver=matched_driver,
+                rider=current_rider,
+                trip_start_time=current_time,
+                pickup_time=pickup_time,
+                pickup_distance=pickup_distance,
+                trip_distance=trip_distance
+            )
+
+            self.event_calendar.add_event(
+                time=pickup_time,
+                event_type=EventType.DRIVER_REACHES_PICKUP,
+                data=new_trip
+            )
+
+            self.driver_queue.remove_by_id(item_id=matched_driver.driver_id)
 
     def get_kpis(self) -> dict:
         total = self.total_rider_requests
