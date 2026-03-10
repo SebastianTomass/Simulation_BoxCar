@@ -32,7 +32,12 @@ def main():
 
     for seed in range(n_replications):
         random.seed(seed)
-        simulation = Simulation(simulation_length=run_length, verbose=False)
+        simulation = Simulation(
+            simulation_length=run_length,
+            verbose=False,
+            fairness_dispatch_enabled=False,
+            repositioning_enabled=True
+        )
         simulation.run()
         results.append(simulation.get_kpis())
 
