@@ -1,7 +1,29 @@
 # main() file
+import math
 import random
 from statistics import mean, stdev
 from simulation1 import Simulation
+
+def summarize_metric(values):
+    n = len(values)
+    m = mean(values)
+    s = stdev(values) if n > 1 else 0.0
+    half_width = 1.96 * s / math.sqrt(n) if n > 1 else 0.0
+    return {
+        "mean": m,
+        "sd": s,
+        "ci_low": m - half_width,
+        "ci_high": m + half_width,
+    }
+
+def print_metric_summary(name, values):
+    summary = summarize_metric(values)
+    print(
+        f"{name}: "
+        f"mean={summary['mean']:.4f}, "
+        f"sd={summary['sd']:.4f}, "
+        f"95% CI=({summary['ci_low']:.4f}, {summary['ci_high']:.4f})"
+    )
 
 def main():
     n_replications = 30
@@ -15,23 +37,16 @@ def main():
         simulation.run()
         results.append(simulation.get_kpis())
 
-    print("===== MEAN KPI OVER REPLICATIONS: REVISED MODEL =====")
+    print("===== KPI SUMMARY OVER REPLICATIONS: REVISED MODEL =====")
     print(f"Replications: {n_replications}")
     print(f"Run length: {run_length} hours")
 
-    ab_rates = [r['abandonment_rate'] for r in results]
-    pickup_waits = [r['avg_pickup_wait_hours'] for r in results]
-    system_times = [r['avg_system_time_hours'] for r in results]
-    earnings = [r['avg_driver_earnings_per_hour'] for r in results]
-    fairness = [r['fairness_cv'] for r in results]
-    idle_props = [r['avg_driver_idle_proportion'] for r in results]
-
-    print(f"Abandonment rate: mean={mean(ab_rates):.4f}, sd={stdev(ab_rates):.4f}")
-    print(f"Avg pickup wait (hours): mean={mean(pickup_waits):.4f}, sd={stdev(pickup_waits):.4f}")
-    print(f"Avg rider system time (hours): mean={mean(system_times):.4f}, sd={stdev(system_times):.4f}")
-    print(f"Avg driver earnings/hour: mean={mean(earnings):.4f}, sd={stdev(earnings):.4f}")
-    print(f"Fairness CV: mean={mean(fairness):.4f}, sd={stdev(fairness):.4f}")
-    print(f"Avg driver idle proportion: mean={mean(idle_props):.4f}, sd={stdev(idle_props):.4f}")
+    print_metric_summary("Abandonment rate", [r["abandonment_rate"] for r in results])
+    print_metric_summary("Avg pickup wait (hours)", [r["avg_pickup_wait_hours"] for r in results])
+    print_metric_summary("Avg rider system time (hours)", [r["avg_system_time_hours"] for r in results])
+    print_metric_summary("Avg driver earnings/hour", [r["avg_driver_earnings_per_hour"] for r in results])
+    print_metric_summary("Fairness CV", [r["fairness_cv"] for r in results])
+    print_metric_summary("Avg driver idle proportion", [r["avg_driver_idle_proportion"] for r in results])
 
 if __name__ == "__main__":
     main()
